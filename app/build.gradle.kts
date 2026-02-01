@@ -27,7 +27,7 @@ dependencies {
 
 sonar {
     properties {
-        property("sonar.projectKey", "qazhtester_qa-auto-engineer-java-project-61")
+        property("sonar.projectKey", "qazhtester_qa-auto-engineer-java-project-71")
         property("sonar.organization", "qazhtester")
     }
 }

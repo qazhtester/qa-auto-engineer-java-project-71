@@ -1,35 +1,76 @@
 package hexlet.code;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
-public class Differ {
+public final class Differ {
+
+    private Differ() {
+    }
 
     public static String generate(String filepath1, String filepath2) throws IOException {
-        Path path1 = Paths.get(filepath1).toAbsolutePath().normalize();
-        Path path2 = Paths.get(filepath2).toAbsolutePath().normalize();
+        Path path1 = FileUtil.resolvePath(filepath1);
+        Path path2 = FileUtil.resolvePath(filepath2);
 
-        System.out.println(path1);
-        System.out.println(path2);
+        Map<String, String> file1Map = FileUtil.readFileAsMap(path1);
+        Map<String, String> file2Map = FileUtil.readFileAsMap(path2);
+        Map<String, Diff> diffMap = getDiff(file1Map, file2Map);
+        return buildResult(diffMap);
+    }
 
-        String file1Content = Files.readString(path1);
-        String file2Content = Files.readString(path2);
+    private static Map<String, Diff> getDiff(Map<String, String> source, Map<String, String> target) {
+        Set<String> allKeys = new TreeSet<>();
+        allKeys.addAll(source.keySet());
+        allKeys.addAll(target.keySet());
+        Map<String, Diff> diffMap = new TreeMap<>();
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> file1Map = objectMapper.readValue(file1Content, new TypeReference<>() {
-        });
-        Map<String, String> file2Map = objectMapper.readValue(file2Content, new TypeReference<>() {
-        });
+        for (String key : allKeys) {
+            String sourceValue = source.get(key);
+            String targetValue = target.get(key);
 
-        System.out.println(file1Map);
-        System.out.println(file2Map);
-        return "no result yet";
+            if (sourceValue != null && targetValue != null) {
+                if (!Objects.equals(sourceValue, targetValue)) {
+                    Diff updated = new Diff(DiffType.UPDATED, sourceValue, targetValue);
+                    diffMap.put(key, updated);
+                } else {
+                    Diff notChanged = new Diff(DiffType.NOT_CHANGED, sourceValue);
+                    diffMap.put(key, notChanged);
+                }
+            } else if (sourceValue != null) {
+                Diff removed = new Diff(DiffType.REMOVED, sourceValue);
+                diffMap.put(key, removed);
+            } else {
+                Diff added = new Diff(DiffType.ADDED, targetValue);
+                diffMap.put(key, added);
+            }
+        }
+        return diffMap;
+    }
+
+    private static String buildResult(Map<String, Diff> diffMap) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+
+        for (Map.Entry<String, Diff> entry : diffMap.entrySet()) {
+            String field = entry.getKey();
+            Diff diff = entry.getValue();
+
+            switch (diff.getType()) {
+                case UPDATED -> {
+                    sb.append("   - ").append(field).append(": ").append(diff.getValue()).append("\n");
+                    sb.append("   + ").append(field).append(": ").append(diff.getNewValue()).append("\n");
+                }
+                case NOT_CHANGED -> sb.append("     ").append(field).append(": ").append(diff.getValue()).append("\n");
+                case ADDED -> sb.append("   + ").append(field).append(": ").append(diff.getValue()).append("\n");
+                case REMOVED -> sb.append("   - ").append(field).append(": ").append(diff.getValue()).append("\n");
+            }
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }
